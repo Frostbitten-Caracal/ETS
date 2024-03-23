@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { Server, StableBTreeMap } from "azle";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -29,7 +29,7 @@ const events = StableBTreeMap<string, Event>(0);
 const tickets = StableBTreeMap<string, Ticket>(1);
 
 // Middleware to authenticate owner
-function authenticateOwner(req: express.Request, res: express.Response, next: express.NextFunction) {
+function authenticateOwner(req: Request, res: Response, next: NextFunction) {
     const username = req.headers["username"] as string;
     const password = req.headers["password"] as string;
 
@@ -42,13 +42,22 @@ function authenticateOwner(req: express.Request, res: express.Response, next: ex
     }
 }
 
+// Middleware for input validation
+function validateEventInput(req: Request, res: Response, next: NextFunction) {
+    const { name, date, venue, owner } = req.body as Event;
+    if (!name || !date || !venue || !owner) {
+        return res.status(400).send("Missing required fields");
+    }
+    next();
+}
+
 // Define the server
 export default Server(() =>  {
     const app = express();
     app.use(express.json());
 
     // Route to create an event
-    app.post("/events", (req, res) => {
+    app.post("/events", authenticateOwner, validateEventInput, (req, res) => {
         const event: Event = { id: uuidv4(), tickets: [], isOpen: true, ...req.body };
         events.insert(event.id, event);
         res.json(event);
